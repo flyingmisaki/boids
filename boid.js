@@ -5,31 +5,33 @@ class Boid {
         this.velocity = p5.Vector.random2D()
         this.velocity.setMag(random(2, 4))
         this.acceleration = createVector()
-        this.maxForce = 0.6 // Max steering force
-        this.maxSpeed = 2 // Max steering speed
+        this.maxForce = 0.1 // Max steering force
+        this.maxSpeed = 1 // Max steering speed
+        this.triangleSize = 3
+        this.perceptionRadius = 50
     }
 
     /*
-    Crappy logic so that boids reappear on 
+    Logic so that boids reappear on 
     the other side of the screen (like a taurus)
-    +++ TO IMPLEMENT PROPERLY +++
     */
-    edges() {
+    correctPosition() {
         if (this.position.x > width) {
             this.position.x = 0
-        } else if (this.position.x < 0) {
+        }
+        else if (this.position.x < 0) {
             this.position.x = width
         }
         if (this.position.y > width) {
             this.position.y = 0
-        } else if (this.position.y < 0) {
+        }
+        else if (this.position.y < 0) {
             this.position.y = width
         }
     }
 
     // Aligns the boids and returns a steering force
-    align(boids) {
-        let perceptionRadius = 50
+    alignWithNeighbors(boids) {
         let steering = createVector()
         let total = 0
         
@@ -41,23 +43,28 @@ class Boid {
                 other.position.y
             )
             
-            if ( other != this && d < perceptionRadius) {
+            if ( other != this && d < this.perceptionRadius) {
                 steering.add(other.velocity)
                 total++
             }
         }
+
+        // at this point, "steering" actually contains the group net velocity
         
         if (total > 0) {
             steering.div(total)
+            // At this point, "steering" contains group avg velocity
+
             steering.setMag(this.maxSpeed)
+            // At this point, "steering" is a velocity vector in the direction of the group's average, at max speed
+
             steering.sub(this.velocity)
             steering.limit(this.maxForce)
         }
         return steering
     }
 
-    separation(boids) {
-        let perceptionRadius = 50
+    separateFromNeighbors(boids) {
         let steering = createVector()
         let total = 0
         
@@ -69,7 +76,7 @@ class Boid {
                 other.position.y
             )
             
-            if ( other != this && d < perceptionRadius) {
+            if ( other != this && d < this.perceptionRadius) {
                 let diff = p5.Vector.sub(this.position, other.position)
                 diff.mult(1 / d) //Inversly proportional (further = lower magnitude)
                 steering.add(diff)
@@ -80,15 +87,14 @@ class Boid {
         if (total > 0) {
             steering.div(total)
             steering.setMag(this.maxSpeed)
-            steering.sub(this.velocity)
+            //steering.sub(this.velocity)
             steering.limit(this.maxForce)
         }
         return steering
     }
 
     // Steer towards the average centre of mass of the flock
-    cohesion(boids) {
-        let perceptionRadius = 50
+    cohereWithNeighbors(boids) {
         let steering = createVector()
         let total = 0
         
@@ -100,7 +106,7 @@ class Boid {
                 other.position.y
             )
             
-            if ( other != this && d < perceptionRadius) {
+            if ( other != this && d < this.perceptionRadius) {
                 steering.add(other.position)
                 total++
             }
@@ -119,18 +125,14 @@ class Boid {
     // Flocking of the boids
     flock(boids) {
         this.acceleration.set(0, 0) // Stops from accumulating acceleration
-
-        let alignment = this.align(boids)
-        let cohesion = this.cohesion(boids)
-        let separation = this.separation(boids)
-
-        alignment.mult(alignSlider.value())
-        cohesion.mult(cohesionSlider.value())
-        separation.mult(separationSlider.value())
         
+        let separation = this.separateFromNeighbors(boids)
+        let alignment = this.alignWithNeighbors(boids)
+        let cohesion = this.cohereWithNeighbors(boids)
+
+        this.acceleration.add(separation)
         this.acceleration.add(alignment)
         this.acceleration.add(cohesion)
-        this.acceleration.add(separation)
     }
 
     // Updates the position of the boid
@@ -140,10 +142,17 @@ class Boid {
         this.velocity.limit(this.maxSpeed)
     }
 
-    // Drawing and stroke of the boid
-    show() {
-        strokeWeight(8)
-        stroke(255)
-        point(this.position.x, this.position.y)
+    // Rendering of the boid as a triangle and rotation towards velocity
+    render() {
+        let theta = this.velocity.heading() + radians(90);
+        push()
+        translate(this.position.x, this.position.y)
+        rotate(theta)
+        beginShape()
+        vertex(0, -this.triangleSize * 2)
+        vertex(-this.triangleSize, this.triangleSize * 2)
+        vertex(this.triangleSize, this.triangleSize * 2)
+        endShape()
+        pop()
     }
 }
